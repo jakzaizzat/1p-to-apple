@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>1Password → Apple Passwords Migration</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', 'Segoe UI', system-ui, sans-serif;
+    background: #0a0a0a; color: #e5e5e5; min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 2rem 1rem;
+  }
+  .container { max-width: 640px; width: 100%; }
+  h1 { font-size: 1.75rem; font-weight: 700; text-align: center; margin-bottom: .25rem; }
+  .subtitle { text-align: center; color: #888; font-size: .95rem; margin-bottom: 2rem; }
+  .privacy {
+    background: #111; border: 1px solid #2a2a2a; border-radius: 10px;
+    padding: .75rem 1rem; text-align: center; font-size: .85rem; color: #6ee7b7;
+    margin-bottom: 2rem; display: flex; align-items: center; justify-content: center; gap: .5rem;
+  }
+  .privacy svg { flex-shrink: 0; }
+  .drop-zone {
+    border: 2px dashed #333; border-radius: 12px; padding: 3rem 2rem;
+    text-align: center; cursor: pointer; transition: all .2s;
+    background: #111; position: relative;
+  }
+  .drop-zone:hover, .drop-zone.dragover { border-color: #6366f1; background: #18181b; }
+  .drop-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .drop-zone .icon { font-size: 2.5rem; margin-bottom: .75rem; }
+  .drop-zone p { color: #888; font-size: .95rem; }
+  .drop-zone .formats { color: #555; font-size: .8rem; margin-top: .5rem; }
+  .results { margin-top: 2rem; display: none; }
+  .results.show { display: block; }
+  .summary {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;
+  }
+  .stat {
+    background: #111; border: 1px solid #2a2a2a; border-radius: 10px;
+    padding: 1.25rem; text-align: center;
+  }
+  .stat .num { font-size: 2rem; font-weight: 700; }
+  .stat .num.green { color: #6ee7b7; }
+  .stat .num.yellow { color: #fbbf24; }
+  .stat .label { color: #888; font-size: .85rem; margin-top: .25rem; }
+  .btn {
+    display: block; width: 100%; padding: .875rem; border: none; border-radius: 10px;
+    font-size: 1rem; font-weight: 600; cursor: pointer; transition: all .15s;
+    margin-bottom: 1rem;
+  }
+  .btn-primary { background: #6366f1; color: #fff; }
+  .btn-primary:hover { background: #818cf8; }
+  .btn-secondary { background: #1f1f1f; color: #e5e5e5; border: 1px solid #333; }
+  .btn-secondary:hover { background: #2a2a2a; }
+  .breakdown { margin-top: 1.5rem; }
+  .breakdown h3 { font-size: 1rem; font-weight: 600; margin-bottom: .75rem; color: #ccc; }
+  .cat-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: .5rem .75rem; border-radius: 6px; font-size: .9rem;
+  }
+  .cat-row:nth-child(even) { background: #111; }
+  .cat-row .count { color: #888; font-weight: 500; }
+  .steps {
+    margin-top: 2rem; background: #111; border: 1px solid #2a2a2a; border-radius: 10px; padding: 1.25rem;
+  }
+  .steps h3 { font-size: .95rem; font-weight: 600; margin-bottom: .75rem; }
+  .steps ol { padding-left: 1.25rem; color: #aaa; font-size: .85rem; line-height: 1.7; }
+  .steps code { background: #1f1f1f; padding: .15rem .4rem; border-radius: 4px; font-size: .8rem; color: #c4b5fd; }
+  .processing { text-align: center; padding: 2rem; color: #888; display: none; }
+  .processing.show { display: block; }
+  .spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid #333; border-top-color: #6366f1; border-radius: 50%; animation: spin .6s linear infinite; margin-bottom: .5rem; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  footer { margin-top: 3rem; text-align: center; color: #444; font-size: .75rem; }
+  footer a { color: #6366f1; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>1Password → Apple Passwords</h1>
+  <p class="subtitle">Migrate your passwords, cards, notes & more</p>
+
+  <div class="privacy">
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#6ee7b7" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+    Everything runs locally in your browser. No data is sent anywhere.
+  </div>
+
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" accept=".1pux">
+    <div class="icon">📦</div>
+    <p>Drop your <strong>.1pux</strong> file here or click to browse</p>
+    <p class="formats">Export from 1Password → File → Export → 1PUX format</p>
+  </div>
+
+  <div class="processing" id="processing">
+    <div class="spinner"></div>
+    <p>Processing your vault...</p>
+  </div>
+
+  <div class="results" id="results">
+    <div class="summary">
+      <div class="stat"><div class="num green" id="migratedCount">0</div><div class="label">Migrated</div></div>
+      <div class="stat"><div class="num yellow" id="skippedCount">0</div><div class="label">Skipped (trashed)</div></div>
+    </div>
+    <button class="btn btn-primary" id="downloadBtn">⬇ Download CSV for Apple Passwords</button>
+    <button class="btn btn-secondary" id="downloadReport">📋 Download Report</button>
+    <div class="breakdown" id="breakdown"></div>
+  </div>
+
+  <div class="steps">
+    <h3>How to import into Apple Passwords</h3>
+    <ol>
+      <li>Open <strong>Passwords</strong> app on macOS (Sequoia+)</li>
+      <li>Go to <strong>File → Import Passwords…</strong></li>
+      <li>Select the downloaded <code>passwords.csv</code></li>
+      <li>Review and confirm the import</li>
+    </ol>
+  </div>
+
+  <footer>
+    Open source · <a href="https://github.com/jakzaizzat/1p-to-apple" target="_blank">GitHub</a>
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+const CATEGORIES = {
+  "001":"Login","002":"Credit Card","003":"Secure Note","004":"Identity","005":"Password",
+  "006":"Document","100":"Software License","101":"Bank Account","102":"Database",
+  "103":"Driver's License","104":"Outdoor License","105":"Membership","106":"Passport",
+  "107":"Rewards Program","108":"Social Security Number","109":"Wireless Router",
+  "110":"Server","111":"Email Account","112":"API Credential","113":"Medical Record",
+  "114":"SSH Key","115":"Crypto Wallet"
+};
+const LOGIN_CATS = new Set(["001","005"]);
+
+function getLoginFields(item) {
+  let u = "", p = "";
+  const d = item.details || {};
+  for (const f of (d.loginFields || [])) {
+    if (!f) continue;
+    const v = f.value || "";
+    if (f.designation === "username" && v) u = v;
+    if (f.designation === "password" && v) p = v;
+  }
+  if (!p) p = d.password || "";
+  return [u, p];
+}
+
+function getUrls(item) {
+  const o = item.overview || {}, urls = [];
+  if (o.url) urls.push(o.url);
+  for (const u of (o.urls || [])) {
+    if (u && u.url && !urls.includes(u.url)) urls.push(u.url);
+  }
+  return urls;
+}
+
+function getTotp(item) {
+  const d = item.details || {};
+  for (const s of (d.sections || [])) {
+    if (!s) continue;
+    for (const f of (s.fields || [])) {
+      if (!f) continue;
+      const fid = (f.id || "").toUpperCase(), fv = f.value;
+      if (typeof fv === "string" && fv.startsWith("otpauth://")) return fv;
+      if (fv && typeof fv === "object") {
+        const t = fv.totp || "";
+        if (t.startsWith("otpauth://")) return t;
+      }
+      if (fid.includes("TOTP") || fid === "ONE_TIME_PASSWORD") {
+        if (typeof fv === "string" && fv) {
+          if (fv.startsWith("otpauth://")) return fv;
+          const title = (item.overview || {}).title || "unknown";
+          return `otpauth://totp/${title}?secret=${fv}&issuer=${title}`;
+        }
+      }
+    }
+  }
+  return "";
+}
+
+function extractAllFields(item, cat) {
+  const lines = [], d = item.details || {};
+  if (cat === "002") {
+    for (const [k, l] of [["ccnum","Card Number"],["cvv","CVV"],["expiry","Expiry"],["cardholder","Cardholder"],["pin","PIN"],["bank","Bank"],["type","Type"],["validFrom","Valid From"]]) {
+      let v = d[k] || ""; if (!v) continue;
+      if (k === "expiry" && /^\d+$/.test(v)) { try { const dt = new Date(parseInt(v)*1000); v = `${String(dt.getMonth()+1).padStart(2,"0")}/${dt.getFullYear()}`; } catch(e){} }
+      lines.push(`${l}: ${v}`);
+    }
+  }
+  if (cat === "101") {
+    for (const [k,l] of [["bankName","Bank"],["accountType","Type"],["routingNo","Routing"],["accountNo","Account"],["swift","SWIFT"],["iban","IBAN"],["branchAddress","Branch"],["branchPhone","Phone"]]) {
+      const v = d[k] || ""; if (v) lines.push(`${l}: ${v}`);
+    }
+  }
+  if (cat === "004") {
+    for (const [k,l] of [["firstname","First Name"],["lastname","Last Name"],["initial","Initial"],["gender","Gender"],["birthdate","Birth Date"],["occupation","Occupation"],["company","Company"],["department","Department"],["jobtitle","Job Title"],["address","Address"],["email","Email"],["phone","Phone"],["cell","Cell"],["website","Website"]]) {
+      const v = d[k] || ""; if (v) lines.push(`${l}: ${v}`);
+    }
+  }
+  for (const s of (d.sections || [])) {
+    if (!s) continue;
+    const st = s.title || "";
+    for (const f of (s.fields || [])) {
+      if (!f) continue;
+      const ft = f.title || f.id || "";
+      let fv = f.value;
+      if (fv && typeof fv === "object") { fv = Object.entries(fv).filter(([,v])=>v).map(([k,v])=>`${k}: ${v}`).join(", "); }
+      if (fv && String(fv).trim()) { lines.push(`${st ? st+" > " : ""}${ft}: ${fv}`); }
+    }
+  }
+  for (const f of (d.loginFields || [])) {
+    if (!f) continue;
+    const v = f.value || "", n = f.name || f.designation || "";
+    if (v) lines.push(`${n}: ${v}`);
+  }
+  return lines.join("\n");
+}
+
+function getExtraFields(item) {
+  const extras = [], d = item.details || {};
+  for (const s of (d.sections || [])) {
+    if (!s) continue;
+    const st = s.title || "";
+    for (const f of (s.fields || [])) {
+      if (!f) continue;
+      const fid = (f.id || "").toUpperCase();
+      if (fid.includes("TOTP") || fid === "ONE_TIME_PASSWORD") continue;
+      const ft = f.title || f.id || "";
+      let fv = f.value;
+      if (fv && typeof fv === "object") fv = JSON.stringify(fv);
+      if (fv && String(fv).trim()) extras.push(`${st ? st+": " : ""}${ft}: ${fv}`);
+    }
+  }
+  return extras;
+}
+
+function processItems(data) {
+  const migrated = [], skipped = [];
+  for (const account of (data.accounts || [])) {
+    for (const vault of (account.vaults || [])) {
+      const vaultName = (vault.attrs || {}).name || "Unknown";
+      for (const item of (vault.items || [])) {
+        const cat = item.categoryUuid || "";
+        const title = ((item.overview || {}).title || "").trim();
+        const state = item.state || "active";
+        const catName = CATEGORIES[cat] || `Unknown (${cat})`;
+
+        if (state === "trashed") {
+          skipped.push({ title, category: catName, vault: vaultName, reason: "Trashed" });
+          continue;
+        }
+
+        let [username, password] = getLoginFields(item);
+        const urls = getUrls(item);
+        const totp = getTotp(item);
+        let notes = (item.details || {}).notesPlain || "";
+        const extraFields = getExtraFields(item);
+
+        if (!LOGIN_CATS.has(cat)) {
+          const all = extractAllFields(item, cat);
+          if (all) { notes = `[${catName}]\n${notes ? notes + "\n\n" + all : all}`; }
+          else if (!notes) { notes = `[${catName}]`; }
+        }
+
+        if (state === "archived") {
+          notes = notes ? `[Archived]\n${notes}` : "[Archived]";
+        }
+
+        if (extraFields.length) {
+          notes = (notes ? notes + "\n\n--- Additional Fields ---\n" : "") + extraFields.join("\n");
+        }
+
+        const urlList = urls.length ? urls : [""];
+        migrated.push({ Title: title, URL: urlList[0], Username: username, Password: password, Notes: notes, OTPAuth: totp, _cat: catName });
+        for (let i = 1; i < urlList.length; i++) {
+          migrated.push({ Title: `${title} (${urlList[i]})`, URL: urlList[i], Username: username, Password: password, Notes: notes, OTPAuth: totp, _cat: catName });
+        }
+      }
+    }
+  }
+  return { migrated, skipped };
+}
+
+function toCSV(rows) {
+  const fields = ["Title","URL","Username","Password","Notes","OTPAuth"];
+  const escape = v => { const s = String(v||""); return s.includes(",") || s.includes('"') || s.includes("\n") ? '"'+s.replace(/"/g,'""')+'"' : s; };
+  const lines = [fields.join(",")];
+  for (const r of rows) lines.push(fields.map(f => escape(r[f])).join(","));
+  return lines.join("\r\n");
+}
+
+function toReport(migrated, skipped) {
+  const lines = ["="+"=".repeat(59), "1Password → Apple Passwords: Migration Report", "="+"=".repeat(59), ""];
+  // Migrated breakdown
+  const cats = {};
+  for (const r of migrated) { cats[r._cat] = (cats[r._cat]||0) + 1; }
+  lines.push(`Total migrated: ${migrated.length}`);
+  for (const [c,n] of Object.entries(cats).sort((a,b)=>b[1]-a[1])) lines.push(`  ${c}: ${n}`);
+  lines.push("");
+  if (skipped.length) {
+    lines.push(`Total skipped (trashed): ${skipped.length}`);
+    for (const s of skipped) lines.push(`  • ${s.title} [${s.vault}]`);
+  }
+  return lines.join("\n");
+}
+
+function download(content, filename, type="text/csv") {
+  const blob = new Blob([content], {type});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = filename; a.click(); URL.revokeObjectURL(a.href);
+}
+
+// UI
+const dropZone = document.getElementById("dropZone");
+const fileInput = document.getElementById("fileInput");
+const processing = document.getElementById("processing");
+const results = document.getElementById("results");
+let csvData = "", reportData = "";
+
+dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("dragover"); });
+dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+dropZone.addEventListener("drop", e => { e.preventDefault(); dropZone.classList.remove("dragover"); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener("change", e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+
+async function handleFile(file) {
+  dropZone.style.display = "none";
+  processing.classList.add("show");
+  results.classList.remove("show");
+
+  try {
+    const zip = await JSZip.loadAsync(file);
+    let dataFile = null;
+    zip.forEach((path, entry) => { if (path.endsWith("export.data")) dataFile = entry; });
+    if (!dataFile) throw new Error("No export.data found in .1pux file");
+
+    const json = JSON.parse(await dataFile.async("string"));
+    const { migrated, skipped } = processItems(json);
+
+    csvData = toCSV(migrated);
+    reportData = toReport(migrated, skipped);
+
+    document.getElementById("migratedCount").textContent = migrated.length;
+    document.getElementById("skippedCount").textContent = skipped.length;
+
+    // Breakdown by category
+    const cats = {};
+    for (const r of migrated) cats[r._cat] = (cats[r._cat]||0) + 1;
+    const bd = document.getElementById("breakdown");
+    bd.innerHTML = "<h3>Breakdown by category</h3>" +
+      Object.entries(cats).sort((a,b)=>b[1]-a[1]).map(([c,n]) =>
+        `<div class="cat-row"><span>${c}</span><span class="count">${n}</span></div>`
+      ).join("");
+
+    processing.classList.remove("show");
+    results.classList.add("show");
+  } catch(err) {
+    processing.classList.remove("show");
+    dropZone.style.display = "";
+    alert("Error: " + err.message);
+  }
+}
+
+document.getElementById("downloadBtn").addEventListener("click", () => download(csvData, "passwords.csv"));
+document.getElementById("downloadReport").addEventListener("click", () => download(reportData, "migration_report.txt", "text/plain"));
+</script>
+</body>
+</html>
