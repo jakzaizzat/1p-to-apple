@@ -16,71 +16,79 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', 'Segoe UI', system-ui, sans-serif;
-    background: #0a0a0a; color: #e5e5e5; min-height: 100vh;
+    background: #fafaf9; color: #1c1917; min-height: 100vh;
     display: flex; flex-direction: column; align-items: center;
-    padding: 2rem 1rem;
+    padding: 3rem 1.5rem;
+    -webkit-font-smoothing: antialiased;
   }
-  .container { max-width: 640px; width: 100%; }
-  h1 { font-size: 1.75rem; font-weight: 700; text-align: center; margin-bottom: .25rem; }
-  .subtitle { text-align: center; color: #888; font-size: .95rem; margin-bottom: 2rem; }
+  .container { max-width: 560px; width: 100%; }
+  h1 {
+    font-size: 1.875rem; font-weight: 700; text-align: center;
+    margin-bottom: .375rem; letter-spacing: -.025em; color: #0c0a09;
+  }
+  .subtitle { text-align: center; color: #78716c; font-size: .95rem; margin-bottom: 2.5rem; }
   .privacy {
-    background: #111; border: 1px solid #2a2a2a; border-radius: 10px;
-    padding: .75rem 1rem; text-align: center; font-size: .85rem; color: #6ee7b7;
+    background: #f5f5f4; border: 1px solid #e7e5e4; border-radius: 8px;
+    padding: .625rem 1rem; text-align: center; font-size: .8rem; color: #15803d;
     margin-bottom: 2rem; display: flex; align-items: center; justify-content: center; gap: .5rem;
   }
   .privacy svg { flex-shrink: 0; }
   .drop-zone {
-    border: 2px dashed #333; border-radius: 12px; padding: 3rem 2rem;
+    border: 1.5px dashed #d6d3d1; border-radius: 10px; padding: 3rem 2rem;
     text-align: center; cursor: pointer; transition: all .2s;
-    background: #111; position: relative;
+    background: #fff; position: relative;
   }
-  .drop-zone:hover, .drop-zone.dragover { border-color: #6366f1; background: #18181b; }
+  .drop-zone:hover, .drop-zone.dragover {
+    border-color: #a8a29e; background: #fafaf9;
+    box-shadow: 0 0 0 3px rgba(168, 162, 158, .1);
+  }
   .drop-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-  .drop-zone .icon { font-size: 2.5rem; margin-bottom: .75rem; }
-  .drop-zone p { color: #888; font-size: .95rem; }
-  .drop-zone .formats { color: #555; font-size: .8rem; margin-top: .5rem; }
+  .drop-zone .icon { font-size: 2.25rem; margin-bottom: .75rem; }
+  .drop-zone p { color: #57534e; font-size: .95rem; }
+  .drop-zone .formats { color: #a8a29e; font-size: .8rem; margin-top: .5rem; }
   .results { margin-top: 2rem; display: none; }
   .results.show { display: block; }
   .summary {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;
+    display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin-bottom: 1.5rem;
   }
   .stat {
-    background: #111; border: 1px solid #2a2a2a; border-radius: 10px;
+    background: #fff; border: 1px solid #e7e5e4; border-radius: 10px;
     padding: 1.25rem; text-align: center;
   }
-  .stat .num { font-size: 2rem; font-weight: 700; }
-  .stat .num.green { color: #6ee7b7; }
-  .stat .num.yellow { color: #fbbf24; }
-  .stat .label { color: #888; font-size: .85rem; margin-top: .25rem; }
+  .stat .num { font-size: 2rem; font-weight: 700; letter-spacing: -.025em; }
+  .stat .num.green { color: #16a34a; }
+  .stat .num.yellow { color: #ca8a04; }
+  .stat .label { color: #78716c; font-size: .8rem; margin-top: .25rem; }
   .btn {
-    display: block; width: 100%; padding: .875rem; border: none; border-radius: 10px;
-    font-size: 1rem; font-weight: 600; cursor: pointer; transition: all .15s;
-    margin-bottom: 1rem;
+    display: block; width: 100%; padding: .75rem; border: none; border-radius: 8px;
+    font-size: .925rem; font-weight: 600; cursor: pointer; transition: all .15s;
+    margin-bottom: .75rem;
   }
-  .btn-primary { background: #6366f1; color: #fff; }
-  .btn-primary:hover { background: #818cf8; }
-  .btn-secondary { background: #1f1f1f; color: #e5e5e5; border: 1px solid #333; }
-  .btn-secondary:hover { background: #2a2a2a; }
+  .btn-primary { background: #292524; color: #fafaf9; }
+  .btn-primary:hover { background: #1c1917; }
+  .btn-secondary { background: #fff; color: #292524; border: 1px solid #d6d3d1; }
+  .btn-secondary:hover { background: #f5f5f4; }
   .breakdown { margin-top: 1.5rem; }
-  .breakdown h3 { font-size: 1rem; font-weight: 600; margin-bottom: .75rem; color: #ccc; }
+  .breakdown h3 { font-size: .9rem; font-weight: 600; margin-bottom: .75rem; color: #44403c; }
   .cat-row {
     display: flex; justify-content: space-between; align-items: center;
-    padding: .5rem .75rem; border-radius: 6px; font-size: .9rem;
+    padding: .5rem .75rem; border-radius: 6px; font-size: .875rem;
   }
-  .cat-row:nth-child(even) { background: #111; }
-  .cat-row .count { color: #888; font-weight: 500; }
+  .cat-row:nth-child(even) { background: #f5f5f4; }
+  .cat-row .count { color: #78716c; font-weight: 500; }
   .steps {
-    margin-top: 2rem; background: #111; border: 1px solid #2a2a2a; border-radius: 10px; padding: 1.25rem;
+    margin-top: 2rem; background: #fff; border: 1px solid #e7e5e4; border-radius: 10px; padding: 1.25rem;
   }
-  .steps h3 { font-size: .95rem; font-weight: 600; margin-bottom: .75rem; }
-  .steps ol { padding-left: 1.25rem; color: #aaa; font-size: .85rem; line-height: 1.7; }
-  .steps code { background: #1f1f1f; padding: .15rem .4rem; border-radius: 4px; font-size: .8rem; color: #c4b5fd; }
-  .processing { text-align: center; padding: 2rem; color: #888; display: none; }
+  .steps h3 { font-size: .9rem; font-weight: 600; margin-bottom: .75rem; color: #292524; }
+  .steps ol { padding-left: 1.25rem; color: #57534e; font-size: .85rem; line-height: 1.8; }
+  .steps code { background: #f5f5f4; padding: .15rem .4rem; border-radius: 4px; font-size: .8rem; color: #292524; border: 1px solid #e7e5e4; }
+  .processing { text-align: center; padding: 2rem; color: #78716c; display: none; }
   .processing.show { display: block; }
-  .spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid #333; border-top-color: #6366f1; border-radius: 50%; animation: spin .6s linear infinite; margin-bottom: .5rem; }
+  .spinner { display: inline-block; width: 24px; height: 24px; border: 2.5px solid #e7e5e4; border-top-color: #292524; border-radius: 50%; animation: spin .6s linear infinite; margin-bottom: .5rem; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  footer { margin-top: 3rem; text-align: center; color: #444; font-size: .75rem; }
-  footer a { color: #6366f1; text-decoration: none; }
+  footer { margin-top: 3rem; text-align: center; color: #a8a29e; font-size: .75rem; }
+  footer a { color: #57534e; text-decoration: none; }
+  footer a:hover { color: #292524; }
 </style>
 </head>
 <body>
@@ -90,7 +98,7 @@
   <p class="subtitle">Migrate your passwords, cards, notes & more</p>
 
   <div class="privacy">
-    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#6ee7b7" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#15803d" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
     Everything runs locally in your browser. No data is sent anywhere.
   </div>
 
