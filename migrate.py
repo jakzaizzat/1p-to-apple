@@ -51,6 +51,7 @@ CATEGORIES = {
     "112": "API Credential",
     "113": "Medical Record",
     "114": "SSH Key",
+    "115": "Crypto Wallet",
 }
 
 # Categories with native login fields
@@ -285,13 +286,13 @@ def process_items(data: dict) -> tuple:
                 title = get_title(item)
                 state = item.get("state", "active")
 
-                # Skip archived/trashed items
-                if state != "active":
+                # Skip only trashed items; archived items still migrate
+                if state == "trashed":
                     skipped.append({
                         "title": title,
                         "category": CATEGORIES.get(cat, f"Unknown ({cat})"),
                         "vault": vault_name,
-                        "reason": f"Item is {state}",
+                        "reason": "Item is trashed",
                     })
                     continue
 
@@ -311,26 +312,13 @@ def process_items(data: dict) -> tuple:
                             notes = header + notes + "\n\n" + all_fields
                         else:
                             notes = header + all_fields
+                    elif not notes:
+                        # Tag it so we know what type it was
+                        notes = f"[{cat_name}]"
 
-                    # If still nothing useful at all, skip
-                    if not username and not password and not totp and not notes.strip():
-                        skipped.append({
-                            "title": title,
-                            "category": cat_name,
-                            "vault": vault_name,
-                            "reason": "No data found to migrate",
-                        })
-                        continue
-                else:
-                    # Login/Password category — skip if truly empty
-                    if not username and not password and not totp:
-                        skipped.append({
-                            "title": title,
-                            "category": cat_name,
-                            "vault": vault_name,
-                            "reason": "No username, password, or TOTP found",
-                        })
-                        continue
+                # Mark archived items in notes
+                if state == "archived":
+                    notes = f"[Archived]\n{notes}" if notes else "[Archived]"
 
                 # Append extra fields to notes
                 if extra_fields:
