@@ -53,8 +53,11 @@ CATEGORIES = {
     "114": "SSH Key",
 }
 
-# Categories we can migrate (have username/password semantics)
-MIGRATABLE = {"001", "005"}
+# Categories with native login fields
+LOGIN_CATEGORIES = {"001", "005"}
+
+# All categories are now migratable — non-login items are stored as
+# Apple Passwords entries with all their fields dumped into Notes.
 
 
 def extract_export_data(pux_path: str) -> dict:
@@ -160,6 +163,83 @@ def get_notes(item: dict) -> str:
     return (item.get("details", {}).get("notesPlain", "") or "").strip()
 
 
+def extract_all_fields(item: dict, cat: str) -> str:
+    """Extract ALL fields from non-login items into a readable text block.
+    Handles credit cards, bank accounts, identities, etc."""
+    lines = []
+    details = item.get("details", {})
+
+    # Credit Card specific fields
+    if cat == "002":
+        for key, label in [("ccnum", "Card Number"), ("cvv", "CVV"),
+                           ("expiry", "Expiry"), ("cardholder", "Cardholder"),
+                           ("pin", "PIN"), ("bank", "Bank"),
+                           ("type", "Type"), ("validFrom", "Valid From")]:
+            val = details.get(key, "") or ""
+            if val:
+                # Expiry might be epoch
+                if key == "expiry" and str(val).isdigit():
+                    import datetime
+                    try:
+                        dt = datetime.datetime.fromtimestamp(int(val))
+                        val = dt.strftime("%m/%Y")
+                    except Exception:
+                        pass
+                lines.append(f"{label}: {val}")
+
+    # Bank Account specific
+    if cat == "101":
+        for key, label in [("bankName", "Bank"), ("accountType", "Type"),
+                           ("routingNo", "Routing"), ("accountNo", "Account"),
+                           ("swift", "SWIFT"), ("iban", "IBAN"),
+                           ("branchAddress", "Branch"), ("branchPhone", "Phone")]:
+            val = details.get(key, "") or ""
+            if val:
+                lines.append(f"{label}: {val}")
+
+    # Identity specific
+    if cat == "004":
+        for key, label in [("firstname", "First Name"), ("lastname", "Last Name"),
+                           ("initial", "Initial"), ("gender", "Gender"),
+                           ("birthdate", "Birth Date"), ("occupation", "Occupation"),
+                           ("company", "Company"), ("department", "Department"),
+                           ("jobtitle", "Job Title"), ("address", "Address"),
+                           ("email", "Email"), ("phone", "Phone"),
+                           ("cell", "Cell"), ("website", "Website")]:
+            val = details.get(key, "") or ""
+            if val:
+                lines.append(f"{label}: {val}")
+
+    # Generic: grab all section fields (works for all types)
+    for section in details.get("sections", []) or []:
+        if section is None:
+            continue
+        section_title = section.get("title", "") or ""
+        for field in section.get("fields", []) or []:
+            if field is None:
+                continue
+            ftitle = field.get("title", "") or field.get("id", "") or ""
+            fvalue = field.get("value", "")
+            if isinstance(fvalue, dict):
+                # Flatten dict values
+                parts = [f"{k}: {v}" for k, v in fvalue.items() if v]
+                fvalue = ", ".join(parts) if parts else ""
+            if fvalue and str(fvalue).strip():
+                label = f"{section_title} > {ftitle}" if section_title else ftitle
+                lines.append(f"{label}: {fvalue}")
+
+    # Also grab loginFields if any exist on non-login items
+    for field in details.get("loginFields", []) or []:
+        if field is None:
+            continue
+        val = field.get("value", "") or ""
+        name = field.get("name", "") or field.get("designation", "") or ""
+        if val:
+            lines.append(f"{name}: {val}")
+
+    return "\n".join(lines)
+
+
 def get_extra_fields(item: dict) -> list:
     """Collect non-standard fields from sections for notes."""
     extras = []
@@ -215,31 +295,42 @@ def process_items(data: dict) -> tuple:
                     })
                     continue
 
-                # Skip non-migratable categories
-                if cat not in MIGRATABLE:
-                    skipped.append({
-                        "title": title,
-                        "category": CATEGORIES.get(cat, f"Unknown ({cat})"),
-                        "vault": vault_name,
-                        "reason": f"Category not supported: {CATEGORIES.get(cat, cat)}",
-                    })
-                    continue
-
                 username, password = get_login_fields(item)
                 urls = get_urls(item)
                 totp = get_totp(item)
                 notes = get_notes(item)
                 extra_fields = get_extra_fields(item)
+                cat_name = CATEGORIES.get(cat, f"Unknown ({cat})")
 
-                # Skip items with nothing useful
-                if not username and not password and not totp:
-                    skipped.append({
-                        "title": title,
-                        "category": CATEGORIES.get(cat, cat),
-                        "vault": vault_name,
-                        "reason": "No username, password, or TOTP found",
-                    })
-                    continue
+                # For non-login categories, extract all fields into notes
+                if cat not in LOGIN_CATEGORIES:
+                    all_fields = extract_all_fields(item, cat)
+                    if all_fields:
+                        header = f"[{cat_name}]\n"
+                        if notes:
+                            notes = header + notes + "\n\n" + all_fields
+                        else:
+                            notes = header + all_fields
+
+                    # If still nothing useful at all, skip
+                    if not username and not password and not totp and not notes.strip():
+                        skipped.append({
+                            "title": title,
+                            "category": cat_name,
+                            "vault": vault_name,
+                            "reason": "No data found to migrate",
+                        })
+                        continue
+                else:
+                    # Login/Password category — skip if truly empty
+                    if not username and not password and not totp:
+                        skipped.append({
+                            "title": title,
+                            "category": cat_name,
+                            "vault": vault_name,
+                            "reason": "No username, password, or TOTP found",
+                        })
+                        continue
 
                 # Append extra fields to notes
                 if extra_fields:
